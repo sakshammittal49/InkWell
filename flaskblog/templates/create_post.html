@@ -1,0 +1,168 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section">
+    <form method="POST" action="" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">{{ legend }}</legend>
+            
+            <div class="form-group">
+                {{ form.title.label(class="form-control-label") }}
+                {% if form.title.errors %}
+                    {{ form.title(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.title.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.title(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.content.label(class="form-control-label") }}
+                {% if form.content.errors %}
+                    {{ form.content(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.content.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.content(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <!-- Pictures upload field -->
+            <div class="form-group">
+                {{ form.pictures.label() }}
+                {{ form.pictures(class="form-control-file", id="picturesInput", multiple="multiple") }}
+                {% if form.pictures.errors %}
+                    {% for error in form.pictures.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
+
+
+                <!-- Existing images (shown only when updating a post) -->
+                {% if post is defined and post and post.images %}
+                <div id="existingImagesContainer" class="d-flex flex-wrap mt-2">
+                    {% for image in post.images %}
+                    <div class="position-relative m-1 existing-image-wrapper" id="existing-img-{{ image.id }}" style="width: 90px; height: 90px;">
+                        <img src="{{ url_for('static', filename='post_pics/' + image.image_file) }}"
+                             class="rounded border"
+                             style="width: 100%; height: 100%; object-fit: cover;">
+                        <button type="button"
+                                class="btn btn-danger btn-sm position-absolute"
+                                style="top: -6px; right: -6px; padding: 0px 5px; font-size: 12px; border-radius: 50%; line-height: 1.5;"
+                                onclick="removeExistingImage({{ image.id }})">&times;</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Container where newly-selected image previews will appear -->
+                <div id="previewContainer" class="d-flex flex-wrap mt-2"></div>
+            </div>
+        </fieldset>
+
+        <div class="form-group">
+            {{ form.submit(class="btn btn-outline-info") }}
+        </div>
+    </form>
+</div>
+
+<!-- JavaScript to accumulate files across multiple clicks -->
+<script>
+  const fileInput = document.getElementById('picturesInput');
+  const previewContainer = document.getElementById('previewContainer');
+  
+  // DataTransfer object maintains the persistent queue of selected files
+  const dataTransfer = new DataTransfer();
+
+  fileInput.addEventListener('change', function(e) {
+    const newFiles = Array.from(e.target.files);
+
+    newFiles.forEach(file => {
+      // Prevent adding identical duplicate files
+      const isDuplicate = Array.from(dataTransfer.files).some(
+        f => f.name === file.name && f.size === file.size
+      );
+
+      if (!isDuplicate) {
+        dataTransfer.items.add(file);
+      }
+    });
+
+    // Sync accumulated files back to the form's input
+    fileInput.files = dataTransfer.files;
+
+    // Refresh UI previews
+    renderPreviews();
+  });
+
+  function renderPreviews() {
+    previewContainer.innerHTML = '';
+
+    Array.from(dataTransfer.files).forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'position-relative m-1';
+        wrapper.style.width = '90px';
+        wrapper.style.height = '90px';
+
+        wrapper.innerHTML = `
+          <img src="${e.target.result}" 
+               class="rounded border" 
+               style="width: 100%; height: 100%; object-fit: cover;">
+          <button type="button" 
+                  class="btn btn-danger btn-sm position-absolute" 
+                  style="top: -6px; right: -6px; padding: 0px 5px; font-size: 12px; border-radius: 50%; line-height: 1.5;"
+                  onclick="removeFile(${index})">&times;</button>
+        `;
+        previewContainer.appendChild(wrapper);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeFile(indexToRemove) {
+    const updatedDataTransfer = new DataTransfer();
+
+    Array.from(dataTransfer.files).forEach((file, index) => {
+      if (index !== indexToRemove) {
+        updatedDataTransfer.items.add(file);
+      }
+    });
+
+    // Replace the items in dataTransfer
+    dataTransfer.items.clear();
+    Array.from(updatedDataTransfer.files).forEach(file => {
+      dataTransfer.items.add(file);
+    });
+
+    fileInput.files = dataTransfer.files;
+    renderPreviews();
+  }
+
+  // ── Remove an existing (already-saved) image ──
+  function removeExistingImage(imageId) {
+    // Hide the thumbnail from the UI
+    const wrapper = document.getElementById('existing-img-' + imageId);
+    if (wrapper) {
+      wrapper.remove();
+    }
+
+    // Track the ID so it is sent to the server on form submit
+    const hiddenField = document.getElementById('deleted_images');
+    const current = hiddenField.value;
+    if (current) {
+      hiddenField.value = current + ',' + imageId;
+    } else {
+      hiddenField.value = String(imageId);
+    }
+  }
+</script>
+{% endblock content %}

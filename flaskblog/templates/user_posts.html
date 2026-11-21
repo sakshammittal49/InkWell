@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block content %}
+    <h1 class="mb-3">Posts by {{ user.username }} ({{ posts|length }})</h1>
+    {% for post in posts %}
+        <article class="media content-section">
+          <img class="rounded-circle article-img" src="{{ url_for('static', filename='profile_pics/' + post.author.image_file) }}">
+          <div class="media-body">
+            <div class="article-metadata">
+              <a class="mr-2" href="{{ url_for('user_posts', username=post.author.username) }}">{{ post.author.username }}</a>
+              <small class="text-muted">{{ post.date_posted.strftime('%Y-%m-%d') }}</small>
+              {% if post.author == current_user %}
+                <div>
+                  <a class="btn btn-secondary btn-sm mt-1 mb-1" href="{{ url_for('update_post', post_id=post.id) }}">Update</a>
+                  <button type="button" class="btn btn-danger btn-sm m-1" data-toggle="modal" data-target="#deleteModal-{{ post.id }}">Delete</button>
+                </div>
+              {% endif %}
+            </div>
+            <h2><a class="article-title" href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h2>
+            {% if post.images %}
+              <div class="post-image-scroller mb-3">
+                {% for image in post.images %}
+                  <div class="post-image-item">
+                    <img src="{{ url_for('static', filename='post_pics/' + image.image_file) }}"
+                         alt="{{ post.title }}"
+                         class="img-fluid rounded">
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <p class="article-content">{{ post.content }}</p>
+            <div class="d-flex align-items-center mt-2">
+              {% if current_user.is_authenticated %}
+                <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST" class="d-inline">
+                  {% if current_user in post.liked_by.all() %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      ♥ Unlike
+                    </button>
+                  {% else %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                      ♡ Like
+                    </button>
+                  {% endif %}
+                </form>
+              {% endif %}
+              <small class="text-muted ml-2">{{ post.liked_by.count() }} {{ 'like' if post.liked_by.count() == 1 else 'likes' }}</small>
+              <small class="text-muted ml-3">
+                <a href="{{ url_for('post', post_id=post.id) }}" class="text-muted">{{ post.comments|length }} {{ 'comment' if post.comments|length == 1 else 'comments' }}</a>
+              </small>
+            </div>
+          </div>
+        </article>
+        {% if post.author == current_user %}
+          <!-- Delete Modal for post {{ post.id }} -->
+          <div class="modal fade" id="deleteModal-{{ post.id }}" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel-{{ post.id }}" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="deleteModalLabel-{{ post.id }}">Delete Post?</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                  <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST">
+                    <input class="btn btn-danger" type="submit" value="Delete">
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+    {% endfor %}
+{% endblock content %}
