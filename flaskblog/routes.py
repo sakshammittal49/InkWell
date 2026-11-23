@@ -4,7 +4,7 @@ from PIL import Image
 from flask import render_template, url_for, flash, redirect, request, abort
 from flaskblog import app, db, bcrypt, mail
 from flaskblog.forms import RegistrationForm, LoginForm, UpdateAccountForm, PostForm, RequestResetForm, ResetPasswordForm, CommentForm
-from flaskblog.models import User, Post, PostImage, Comment
+from flaskblog.models import User, Post, PostImage, Comment, Notification
 from flask_login import login_user, current_user, logout_user, login_required
 from flask_mail import Message
 
@@ -128,6 +128,10 @@ def post(post_id):
             abort(403)
         comment = Comment(content=form.content.data, author=current_user, post=post)
         db.session.add(comment)
+        if post.author != current_user:
+            notif = Notification(user_id=post.author.id, actor_id=current_user.id,
+                                 post_id=post.id, action='comment')
+            db.session.add(notif)
         db.session.commit()
         flash('Your comment has been posted!', 'success')
         return redirect(url_for('post', post_id=post.id))
@@ -237,9 +241,24 @@ def like_post(post_id):
         flash('You unliked this post.', 'info')
     else:
         post.liked_by.append(current_user)
+        if post.author != current_user:
+            notif = Notification(user_id=post.author.id, actor_id=current_user.id,
+                                 post_id=post.id, action='like')
+            db.session.add(notif)
         flash('You liked this post!', 'success')
     db.session.commit()
     return redirect(request.referrer or url_for('post', post_id=post.id))
+
+@app.route("/notifications/read/<int:notif_id>", methods=['POST'])
+@login_required
+def mark_notification_read(notif_id):
+    notif = Notification.query.get_or_404(notif_id)
+    if notif.user_id != current_user.id:
+        abort(403)
+    post_id = notif.post_id
+    db.session.delete(notif)
+    db.session.commit()
+    return redirect(url_for('post', post_id=post_id))
 
 @app.route("/comment/<int:comment_id>/delete", methods=['POST'])
 @login_required

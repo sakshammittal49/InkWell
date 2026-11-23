@@ -27,4 +27,34 @@ app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS')
 
 mail = Mail(app)
 
+@app.context_processor
+def sidebar_context():
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        from flaskblog.models import Post, Notification
+        recent_posts = (Post.query
+                        .filter_by(user_id=current_user.id)
+                        .order_by(Post.date_posted.desc())
+                        .limit(5).all())
+        notifications = (Notification.query
+                         .filter_by(user_id=current_user.id, is_read=False)
+                         .order_by(Notification.date_created.desc())
+                         .limit(10).all())
+        total_posts = Post.query.filter_by(user_id=current_user.id).count()
+        total_likes = sum(p.liked_by.count() for p in current_user.posts)
+        return dict(
+            sidebar_recent_posts=recent_posts,
+            sidebar_notifications=notifications,
+            sidebar_notif_count=len(notifications),
+            sidebar_total_posts=total_posts,
+            sidebar_total_likes=total_likes
+        )
+    return dict(
+        sidebar_recent_posts=[],
+        sidebar_notifications=[],
+        sidebar_notif_count=0,
+        sidebar_total_posts=0,
+        sidebar_total_likes=0
+    )
+
 from flaskblog import routes
